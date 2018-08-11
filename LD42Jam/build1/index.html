@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>LD42-Jam</title>
+    <style>* { padding: 0; margin: 0; } canvas { background: #eee; display: block; margin: 0 auto; }</style>
+</head>
+<body>
+
+<div id="game"></div>
+<script type="text/javascript" src="https://rawgithub.com/craftyjs/Crafty/release/dist/crafty-min.js"></script>
+
+<canvas id="Canvas" width="1024" height="896"></canvas>
+
+<script>
+	
+	var enableAudio = true;
+	
+	// GLOBAL DATA LAYER
+	
+	// Helper for Coda Navigator
+	function __globalDataLayer()
+	{
+	}
+	
+	// COLOR CONSTANTS
+	
+	var Color1 = "#f3dcd4";
+	var Color2 = "#ecc9c7";
+	var Color3 = "#d9e3da";
+	var Color4 = "#d1cfc0";
+	var Color5 = "#c2c2b4";
+	var Color6 = "#929284";
+	var Color7 = "#abda40";
+	
+	var levelAreaBGColor = Color3;//"#1c6068";
+	var dbgAreaBGColor = "#000000";
+	var dbgAreaTextColor = "#00ff00";
+	var dialogAreaBGColor = Color4;//"#245aaf";
+	var dialogAreaTextColor = Color6;//"#ffffff";
+	var dialogSSAreaGoTextColor = Color2;
+	
+	var levelGreenSlimeColor = Color7;//"#00ff00";
+	var levelPlayerColor = Color2;//"#0000ff";
+	var levelWallColor = Color6;//"#ff0000";
+	
+	// CANVAS
+	
+	var canvas = document.getElementById("Canvas");
+	var ctx = canvas.getContext("2d");
+	
+	// VARIABLES
+	
+	var levelAreaX = 0;
+	var levelAreaY = 128;
+	var levelAreaDX = 1024;
+	var levelAreaDY = 768;
+	
+	var dbgAreaX = 0;
+	var dbgAreaY = 0;
+	var dbgAreaDX = 1024;
+	var dbgAreaDY = 128;
+	var dbgAreaTextX = 8;
+	var dbgAreaTextY = 20;
+	var dbgAreaTextYK = 16;
+	var dbgAreaTextFont = "16px Arial";
+	
+	var dialogAreaX = levelAreaX + (levelAreaDX / 2) - (levelAreaDX / 4);
+	var dialogAreaY = levelAreaY + (levelAreaDY / 2) - (levelAreaDY / 6);
+	var dialogAreaDX = levelAreaDX / 2;
+	var dialogAreaDY = levelAreaDY / 3;
+	var dialogAreaTextFont = "32px Arial";
+	
+	var dialogSSAreaX = levelAreaX;
+	var dialogSSAreaY = levelAreaY;
+	var dialogSSAreaDX = levelAreaDX;
+	var dialogSSAreaDY = levelAreaDY * 9 / 12;
+	var dialogSSAreaTextFontBig = "64px Arial";
+	var dialogSSAreaTextFont = "24px Arial";
+	var dialogSSAreaTextFont2 = "16px Arial";
+	
+	var levelGridDX = 16;
+	var levelGridDY = 12;
+	var levelCubeSize = levelAreaDY / levelGridDY;
+	
+	var leftPressed = false; // left arrow, A
+	var rightPressed = false; // right arrow, D
+	var upPressed = false; // up arrow, W
+	var downPressed = false; // down arrow, S
+	var actionPressed = false; // enter, space
+	var cancelPressed = false; // ESC
+	var retryPressed = false; // R
+	
+	// AUDIO
+	
+	var assets = {
+		"audio": {
+			"fire": ["audio/Fire17.wav", "audio/Fire17.mp3", "audio/Fire17.ogg"],
+			//"music": ["audio/Level1.wav", "audio/Level1.mp3", "audio/Level1.ogg"]
+			"music": ["audio/Level1.ogg"]
+		}
+	}
+	
+	if (enableAudio)
+	{
+		Crafty.load(assets)
+		
+		Crafty.audio.play("fire", 2, 0.75)
+		Crafty.audio.play("music", -1, 1.0)
+	}
+	
+	// ARRAY OF SPRITES
+	
+	var sprites = [];
+	
+	// LEVEL LAYER
+	
+	// Helper for Coda Navigator
+	function __levelLayer()
+	{
+	}
+	
+	var level = [];
+	var levelPlayerX = 0;
+	var levelPlayerY = 0;
+	var levelPlayerXX = 0;
+	var levelPlayerYY = 0;
+	var levelPlayerKX = 0;
+	var levelPlayerKY = 0;
+	var levelGreenSlimesX = [];
+	var levelGreenSlimesY = [];
+	//@#@ var levelGreenSlimesCount = 0;
+	var levelPlayerMoveStartTime = 0;
+	//@#@ var levelGreenSlimeStartX = 0;
+	//@#@ var levelGreenSlimeStartY = 0;
+	var levelStatusFailed = false;
+	var levelStartTime = 0;
+	var levelCurrentTime = 0;
+	
+	function levelTick(currentTime)
+	{
+		if (level[levelPlayerY][levelPlayerX] == 9)
+		{
+			++currentLevel;
+			levelInit(currentLevel, currentTime);
+		}
+		
+		levelCurrentTime = currentTime;
+		if (levelStatusFailed == true)
+		{
+			if (retryPressed)
+			{
+				levelInit(currentLevel, currentTime);
+			}
+		}
+		if (cancelPressed)
+		{
+			levelInit(currentLevel, currentTime);
+		}
+		if ((levelPlayerXX == 0) && (levelPlayerYY == 0)
+			&& (!levelStatusFailed))
+		{
+			if (leftPressed && !rightPressed)
+			{
+				if (levelPlayerCanGoThere(0, -1))
+				{
+					levelPlayerKX = -1;
+					levelPlayerX += levelPlayerKX;
+					levelPlayerMoveStartTime = currentTime;
+					levelTickGreenSlime();
+				}
+			}
+			if (rightPressed && !leftPressed)
+			{
+				if (levelPlayerCanGoThere(0, 1))
+				{
+					levelPlayerKX = 1;
+					levelPlayerX += levelPlayerKX;
+					levelPlayerMoveStartTime = currentTime;
+					levelTickGreenSlime();
+				}
+			}
+			if (upPressed && !downPressed)
+			{
+				if (levelPlayerCanGoThere(-1, 0))
+				{
+					levelPlayerKY = -1;
+					levelPlayerY += levelPlayerKY;
+					levelPlayerMoveStartTime = currentTime;
+					levelTickGreenSlime();
+				}
+			}
+			if (downPressed && !upPressed)
+			{
+				if (levelPlayerCanGoThere(1, 0))
+				{
+					levelPlayerKY = 1;
+					levelPlayerY += levelPlayerKY;
+					levelPlayerMoveStartTime = currentTime;
+					levelTickGreenSlime();
+				}
+			}
+		}
+		if ((levelPlayerKX != 0) || (levelPlayerKY != 0))
+		{
+			var deltaTime = (currentTime + 16 - levelPlayerMoveStartTime);
+			if (levelPlayerKX != 0)
+			{
+				levelPlayerXX = levelPlayerKX * deltaTime / 2;
+				if (levelPlayerXX >= levelCubeSize)
+				{
+					//@#@ levelPlayerX += 1;
+					levelPlayerXX = 0;
+					levelPlayerKX = 0;
+					levelPlayerMoveStartTime = 0;
+				}
+				else if (levelPlayerXX <= -levelCubeSize)
+				{
+					//@#@ levelPlayerX -= 1;
+					levelPlayerXX = 0;
+					levelPlayerKX = 0;
+					levelPlayerMoveStartTime = 0;
+				}
+			}
+			else if (levelPlayerKY != 0)
+			{
+				levelPlayerYY = levelPlayerKY * deltaTime / 2;
+				if (levelPlayerYY >= levelCubeSize)
+				{
+					//@#@ levelPlayerY += 1;
+					levelPlayerYY = 0;
+					levelPlayerKY = 0;
+					levelPlayerMoveStartTime = 0;
+				}
+				else if (levelPlayerYY <= -levelCubeSize)
+				{
+					//@#@ levelPlayerY -= 1;
+					levelPlayerYY = 0;
+					levelPlayerKY = 0;
+					levelPlayerMoveStartTime = 0;
+				}
+			}
+		}
+		
+		levelPlayerDraw();
+		for (i = 0; i < levelGridDY; ++i)
+		{
+			for (j = 0; j < levelGridDX; ++j)
+			{
+				if (level[i][j] == 2)
+				{
+					levelGreenSlimeDraw(j, i);
+				}
+				if (level[i][j] == 3)
+				{
+					levelDoorDraw(j, i);
+				}
+				if (level[i][j] == 8)
+				{
+					levelWallDraw(j, i);
+				} 
+			}	
+		}
+		if (currentLevel == 0)
+		{
+			drawDialogStartScreen();
+		}
+		if (levelStatusFailed)
+		{
+			drawDialog(1);
+		}
+		if (currentTime - levelStartTime > 2000)
+		{
+			levelStartTime = 0;
+		}
+		if ((levelPlayerKX != 0) || (levelPlayerKY != 0) || levelStartTime != 0
+			|| leftPressed || rightPressed || upPressed || downPressed)
+		{
+			return true;
+		}
+		return false;
+	}
+	
+	function levelTickGreenSlime()
+	{
+		var t0 = performance.now();
+		if (level[levelPlayerY][levelPlayerX]==2)
+		{
+			levelStatusFailed = true;
+			return;
+		}
+		var idx = 0;
+		while (idx < levelGreenSlimesX.length)
+		{
+			var x = levelGreenSlimesX[idx];
+			var y = levelGreenSlimesY[idx];
+			if (level[y][x - 1] == 0)
+			{
+				levelGreenSlimeAdd(x - 1, y);
+				break;
+			}
+			if (level[y + 1][x] == 0)
+			{
+				levelGreenSlimeAdd(x, y + 1);
+				break;
+			}
+			if (level[y][x + 1] == 0)
+			{
+				levelGreenSlimeAdd(x + 1, y);
+				break;
+			}
+			if (level[y - 1][x] == 0)
+			{
+				levelGreenSlimeAdd(x, y - 1);
+				break;
+			}
+			++idx;
+		}
+		var t1 = performance.now();
+		console.log("Call to doSomething took " + (t1 - t0) + " milliseconds.");
+	}
+	
+	function levelInit(lvl, currentTime)
+	{
+		// 1 - PLAYER
+		// 2 - GREEN SLIME
+		// 8 - WALL
+		// 9 - EXIT
+		if (lvl == 0)
+		{
+			level = [
+				[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+				[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+				[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+				[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+				[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+				[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+				[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+				[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+				[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+				[8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8],
+				[3,1,0,0,0,0,0,0,0,0,0,0,0,0,0,9],
+				[8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8],
+			];
+		}
+		else if (lvl == 1)
+		{
+			level = [
+				[8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8],
+				[8,0,0,0,0,0,0,0,0,0,0,0,0,0,2,8],
+				[8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8],
+				[8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8],
+				[8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8],
+				[8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8],
+				[8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8],
+				[8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8],
+				[8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8],
+				[8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8],
+				[3,1,0,0,0,0,0,0,0,0,0,0,0,0,0,9],
+				[8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8],
+			];
+		}
+		else if (lvl == 2)
+		{
+			level = [
+				[8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8],
+				[8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8],
+				[8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8],
+				[8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8],
+				[8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8],
+				[8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8],
+				[8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8],
+				[8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8],
+				[8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8],
+				[8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8],
+				[3,1,0,0,0,0,0,0,0,0,0,0,0,0,0,8],
+				[8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8],
+			];
+		}
+		levelLastCurrentTime = 0;
+		levelPlayerX = 0;
+		levelPlayerY = 0;
+		levelPlayerXX = 0;
+		levelPlayerYY = 0;
+		levelPlayerKX = 0;
+		levelPlayerKY = 0;
+		levelPlayerMoveStartTime = 0;
+		levelGreenSlimesX = [];
+		levelGreenSlimesY = [];
+		levelStatusFailed = false;
+		levelStartTime = currentTime;
+		levelCurrentTime = currentTime;
+		//@#@ levelGreenSlimesCount = 0;
+		//@#@ levelGreenSlimeStartX = 0;
+		//@#@ levelGreenSlimeStartY = 0;
+		for (i = 0; i < levelGridDY; ++i)
+		{
+			for (j = 0; j < levelGridDX; ++j)
+			{
+				if (level[i][j] == 1)
+				{
+					level[i][j] = 0;
+					levelPlayerX = j;
+					levelPlayerY = i;
+					break;
+				}
+				else if (level[i][j] == 2)
+				{
+					levelGreenSlimeAdd(j, i);
+				}
+			}
+		}		
+	}
+	
+	function levelGreenSlimeAdd(x, y)
+	{
+		levelGreenSlimesX.push(x);
+		levelGreenSlimesY.push(y);
+		level[y][x] = 2;
+		if ((levelPlayerX == x) && (levelPlayerY == y))
+		{
+			levelStatusFailed = true;
+		}
+		//@#@ ++levelGreenSlimesCount;
+	}
+	
+	function levelGreenSlimeDraw(x, y)
+	{
+		levelQuadDraw(x * levelCubeSize, y * levelCubeSize, levelCubeSize,
+			levelCubeSize, levelGreenSlimeColor);
+	}
+	
+	function levelDoorDraw(x, y)
+	{
+		var deltaTime = levelCurrentTime - levelStartTime - 500;
+		if (deltaTime < 0)
+		{
+			deltaTime = 0;
+		}
+		var doorDY = deltaTime / 20;
+		if (doorDY > levelCubeSize)
+		{
+			doorDY = levelCubeSize;
+		}
+		levelQuadDraw(x * levelCubeSize, y * levelCubeSize, levelCubeSize,
+			doorDY, levelWallColor);
+	}
+	
+	function levelPlayerCanGoThere(deltaX, deltaY)
+	{
+		var item = level[levelPlayerY + deltaX][levelPlayerX + deltaY];
+		if ((item == 0) || (item == 2) || (item == 9))
+		{
+			return true;
+		}
+		return false;
+	}
+	
+	function levelPlayerDraw()
+	{
+		var x = (levelPlayerX - levelPlayerKX) * levelCubeSize + levelPlayerXX;
+		var y = (levelPlayerY - levelPlayerKY) * levelCubeSize + levelPlayerYY;
+		levelQuadDraw(x, y, levelCubeSize, levelCubeSize, levelPlayerColor);
+	}
+	
+	function levelWallDraw(x, y)
+	{
+		levelQuadDraw(x * levelCubeSize, y * levelCubeSize, levelCubeSize,
+			levelCubeSize, levelWallColor);
+	}
+	
+	function levelQuadDraw(x, y, dx, dy, color)
+	{
+		var xDes = x;
+		var yDes = y;
+		var dxDes = dx;
+		var dyDes = dy;
+		if (levelStartTime != 0)
+		{
+			var deltaTime = levelCurrentTime - levelStartTime;
+			var percent = deltaTime / 5;
+			if (percent > 100)
+			{
+				percent = 100;
+			}
+			xSrc = xDes + dxDes / 2;
+			ySrc = yDes + dyDes / 2;
+			dxSrc = 0;
+			dySrc = 0;
+			xDes = xSrc + (xDes - xSrc) * percent / 100;
+			yDes = ySrc + (yDes - ySrc) * percent / 100;
+			dxDes = dxSrc + (dxDes - dxSrc) * percent / 100;
+			dyDes = dySrc + (dyDes - dySrc) * percent / 100;
+		} 
+		ctx.beginPath();
+		ctx.rect(levelAreaX + xDes, levelAreaY + yDes, dxDes, dyDes);
+		ctx.fillStyle = color;
+		ctx.fill();
+		ctx.closePath();
+	}
+		
+	// GAME LAYER
+	
+	// Helper for Coda Navigator
+	function __gameLayer()
+	{
+	}
+	
+	// DATA
+	
+	var currentLevel = 0
+	
+	// INPUT
+	
+	function keyDownHandler(e) { // see http://keycode.info/
+		if(e.keyCode == 37) {
+			leftPressed = true;
+			return true;
+		}
+		else if(e.keyCode == 38) {
+			upPressed = true;
+			return true;
+		}
+		else if(e.keyCode == 39) {
+			rightPressed = true;
+			return true;
+		}
+		else if(e.keyCode == 40) {
+			downPressed = true;
+			return true;
+		}
+		else if(e.keyCode == 65) {
+			leftPressed = true;
+			return true;
+		}
+		else if(e.keyCode == 87) {
+			upPressed = true;
+			return true;
+		}
+		else if(e.keyCode == 68) {
+			rightPressed = true;
+			return true;
+		}
+		else if(e.keyCode == 83) {
+			downPressed = true;
+			return true;
+		}
+		else if(e.keyCode == 13) {
+			actionPressed = true;
+			return true;
+		}
+		else if(e.keyCode == 32) {
+			actionPressed = true;
+			return true;
+		}
+		else if(e.keyCode == 27) {
+			cancelPressed = true;
+			return true;
+		}
+		else if(e.keyCode == 82) {
+			retryPressed = true;
+			return true;
+		}
+		return false;
+	}
+	
+	function keyUpHandler(e) {
+		if(e.keyCode == 37) {
+			leftPressed = false;
+			return true;
+		}
+		else if(e.keyCode == 38) {
+			upPressed = false;
+			return true;
+		}
+		else if(e.keyCode == 39) {
+			rightPressed = false;
+			return true;
+		}
+		else if(e.keyCode == 40) {
+			downPressed = false;
+			return true;
+		}
+		else if(e.keyCode == 65) {
+			leftPressed = false;
+			return true;
+		}
+		else if(e.keyCode == 87) {
+			upPressed = false;
+			return true;
+		}
+		else if(e.keyCode == 68) {
+			rightPressed = false;
+			return true;
+		}
+		else if(e.keyCode == 83) {
+			downPressed = false;
+			return true;
+		}
+		else if(e.keyCode == 13) {
+		actionPressed = false;
+			return true;
+		}
+		else if(e.keyCode == 32) {
+			actionPressed = false;
+			return true;
+		}
+		else if(e.keyCode == 27) {
+			cancelPressed = false;
+			return true;
+		}
+		else if(e.keyCode == 82) {
+			retryPressed = false;
+			return true;
+		}
+		return false;
+	}
+	
+	function mouseMoveHandler(e) {
+		return true;
+	}
+	
+	// INIT
+	
+	function init(currentTime)
+	{
+		levelInit(currentLevel, currentTime)
+	}
+	
+	// DRAW
+	
+	function drawBackground() {
+		ctx.beginPath();
+		ctx.rect(levelAreaX, levelAreaY, levelAreaDX, levelAreaDY);
+		ctx.fillStyle = levelAreaBGColor;
+		ctx.fill();
+		ctx.closePath();
+	}
+	
+	// TICK
+	
+	var doOnce = true;
+	
+	function tick(currentTime)
+	{
+		if (doOnce)
+		{
+			doOnce = false;
+			init(currentTime);
+		}
+		drawBackground();
+		
+		return levelTick(currentTime);
+		//return false; // true - call me again
+	}
+	
+	// DIALOGS
+	
+	function drawDialog(context)
+	{
+		drawDialogQuad(0, 0, dialogAreaDX, dialogAreaDY, dialogAreaBGColor);
+		if (context == 1)
+		{
+			ctx.font = dialogAreaTextFont;
+			ctx.fillStyle = dialogAreaTextColor;
+		
+			ctx.fillText("You failed!", dialogAreaX + dialogAreaDX / 2 - 75,
+				dialogAreaY + dialogAreaDY / 2 - 30);
+			ctx.fillText("Press ‘R’ to try again.",
+				dialogAreaX + dialogAreaDX / 2 - 150,
+				dialogAreaY + dialogAreaDY / 2 + 50);
+		}
+		
+		drawDialogQuad(0, 0, dialogAreaDX, 1, dialogAreaTextColor);
+		drawDialogQuad(dialogAreaDX - 1, 0, 1, dialogAreaDY,
+			dialogAreaTextColor);
+		drawDialogQuad(0, dialogAreaDY - 1, dialogAreaDX, 1,
+			dialogAreaTextColor);
+		drawDialogQuad(0, 0, 1, dialogAreaDY, dialogAreaTextColor);
+	}
+	
+	function drawDialogStartScreen()
+	{
+		//hack for start screen
+		var dialogAreaXBackup = dialogAreaX;
+		var dialogAreaYBackup = dialogAreaY;
+		dialogAreaX = levelAreaX;
+		dialogAreaY = levelAreaY;
+		
+		drawDialogQuad(0, 0, dialogSSAreaDX, dialogSSAreaDY, dialogAreaBGColor);
+
+		ctx.font = dialogSSAreaTextFontBig;
+		ctx.fillStyle = dialogAreaTextColor;
+		//@#@_@TODO? ctx.fillStyle = levelGreenSlimeColor;
+	
+		ctx.fillText("Green Slime Apocalypse", dialogSSAreaX + dialogSSAreaDX / 2 - 330,
+			dialogSSAreaY + 140);
+	
+		ctx.font = dialogSSAreaTextFont2;
+		ctx.fillStyle = dialogAreaTextColor;
+		ctx.fillText("v. 1.0.0", dialogSSAreaX + dialogSSAreaDX / 2 + 315,
+			dialogSSAreaY + 160);
+	
+		ctx.font = dialogSSAreaTextFont;
+		ctx.fillText("Game made for Ludum Dare 42", dialogSSAreaX + dialogSSAreaDX / 2 - 175,
+			dialogSSAreaY + dialogSSAreaDY / 2 - 30);
+		ctx.font = dialogSSAreaTextFont2;
+		ctx.fillText("Theme: Running out of space", dialogSSAreaX + dialogSSAreaDX / 2 - 110,
+			dialogSSAreaY + dialogSSAreaDY / 2 - 30 + 20);
+		
+		if (actionPressed)
+		{
+			ctx.font = dialogSSAreaTextFontBig;
+			ctx.fillText("CONTROLS: W,A,S,D", dialogSSAreaX + dialogSSAreaDX / 2 - 315,
+			dialogSSAreaY + dialogSSAreaDY / 2 + 125);
+		}
+		else
+		{
+			ctx.font = dialogSSAreaTextFont;
+			ctx.fillText("CONTROLS: W,A,S,D", dialogSSAreaX + dialogSSAreaDX / 2 - 125,
+			dialogSSAreaY + dialogSSAreaDY / 2 + 110);
+		}
+		
+		ctx.font = dialogSSAreaTextFont;
+		ctx.fillText("Copyright © 2018, Pavel M. Dlouhy (game code and \"programmer's art\")",
+			dialogSSAreaX + dialogSSAreaDX / 2 - 380,
+			dialogSSAreaY + dialogSSAreaDY - 50);
+		ctx.fillText("and Vaclav B. Spiral (music)",
+			dialogSSAreaX + dialogSSAreaDX / 2 - 145,
+			dialogSSAreaY + dialogSSAreaDY - 50 + 26);
+		
+		//ctx.fillStyle = dialogSSAreaGoTextColor;
+		//ctx.fillText("GO ==>",
+		//	dialogSSAreaX + dialogSSAreaDX / 2 - 50,
+		//	dialogSSAreaY + dialogSSAreaDY + 45);
+		
+		drawDialogQuad(0, 0, dialogSSAreaDX, 1, dialogAreaTextColor);
+		drawDialogQuad(dialogSSAreaDX - 1, 0, 1, dialogSSAreaDY,
+			dialogAreaTextColor);
+		drawDialogQuad(0, dialogSSAreaDY - 1, dialogSSAreaDX, 1,
+			dialogAreaTextColor);
+		drawDialogQuad(0, 0, 1, dialogSSAreaDY, dialogAreaTextColor);
+		
+		dialogAreaX = dialogAreaXBackup;
+		dialogAreaY = dialogAreaYBackup;
+	}
+	
+	function drawDialogQuad(x, y, dx, dy, color)
+	{
+		ctx.beginPath();
+		ctx.rect(dialogAreaX + x, dialogAreaY + y, dx, dy);
+		ctx.fillStyle = color;
+		ctx.fill();
+		ctx.closePath();
+	}
+	
+	// LAYER 1
+	
+	// Helper for Coda Navigator
+	function __layer1()
+	{
+	}
+	
+	// LAYER 1 - DBG
+
+	function layer1DbgDrawBackground() {
+		ctx.beginPath();
+		ctx.rect(dbgAreaX, dbgAreaY, dbgAreaDX, dbgAreaDY);
+		ctx.fillStyle = dbgAreaBGColor;
+		ctx.fill();
+		ctx.closePath();
+	}
+
+	function layer1DbgTick(currentTime)
+	{
+		++layer1DbgTickCall;
+		layer1DbgDrawBackground();
+		
+		var framesPerSecond = 0;
+		
+		if (layer1LastCurrentTime != 0)
+		{
+			if (layer1LastCurrentTime < currentTime)
+			{
+				framesPerSecond = 1000 / (currentTime - layer1LastCurrentTime);
+			}
+		}
+		
+		var yK = 0;
+		
+		ctx.font = dbgAreaTextFont;
+		ctx.fillStyle = dbgAreaTextColor;
+		
+		ctx.fillText("CurrentTime: " + currentTime, dbgAreaX + dbgAreaTextX, dbgAreaY + dbgAreaTextY + yK++ * dbgAreaTextYK);
+		ctx.fillText("DrawCall: " + layer1DbgTickCall, dbgAreaX + dbgAreaTextX, dbgAreaY + dbgAreaTextY + yK++ * dbgAreaTextYK);
+		ctx.fillText("dbgEventCall: " + layer1DbgEventCall, dbgAreaX + dbgAreaTextX, dbgAreaY + dbgAreaTextY + yK++ * dbgAreaTextYK);
+		ctx.fillText("FPS: " + framesPerSecond, dbgAreaX + dbgAreaTextX, dbgAreaY + dbgAreaTextY + yK++ * dbgAreaTextYK);
+		ctx.fillText("MouseX: " + layer1MouseX, dbgAreaX + dbgAreaTextX, dbgAreaY + dbgAreaTextY + yK++ * dbgAreaTextYK);
+		ctx.fillText("MouseY: " + layer1MouseY, dbgAreaX + dbgAreaTextX, dbgAreaY + dbgAreaTextY + yK++ * dbgAreaTextYK);
+		
+		layer1LastCurrentTime = currentTime;
+	}
+
+	// LAYER 1 - MAIN
+	
+	var layer1LastCurrentTime = 0;
+	var layer1MouseX = 0;
+	var layer1MouseY = 0;
+	
+	//var layer1DbgPause = false;
+	var layer1DbgTickCall = 0;
+	var layer1DbgEventCall = 0;	
+	
+	function layer1KeyDownHandler(e) { // see http://keycode.info/
+		++layer1DbgEventCall;
+		return keyDownHandler(e);
+	}
+	
+	function layer1KeyUpHandler(e) {
+		++layer1DbgEventCall;
+		return keyUpHandler(e);
+	}
+	
+	function layer1MouseMoveHandler(e) {
+		++layer1DbgEventCall;
+		layer1MouseX = e.clientX - canvas.offsetLeft;
+		//if(relativeX > 0 && relativeX < canvas.width) {
+		//}
+		layer1MouseY = e.clientY - canvas.offsetTop;
+		return mouseMoveHandler(e);
+	}
+
+	function layer1Tick(currentTime, dbgSupport)
+	{
+		++layer1DbgTickCall;
+		var retVal = tick(currentTime);
+		if (dbgSupport)
+		{
+			layer1DbgTick(currentTime);
+		}
+		return retVal;
+	}
+
+	// LAYER 0
+	
+	// Helper for Coda Navigator
+	function __layer0()
+	{
+	}
+	
+	// LAYER 0 - CONFIG
+	
+	var layer0KeyboardSupport = true;
+	var layer0MouseSupport = true;
+	var layer0DbgSupport = true;
+	var layer0LogSupport = true;
+	var layer0ErrorAlert = true;
+	
+	// LAYER 0 - VARIABLES
+	
+	var layer0AnimationFrameRequested = 0;
+	
+	// LAYER 0 - FUNCTIONS
+	
+	function log(string)
+	{
+		if (layer0LogSupport)
+		{
+			console.log(string);
+		}
+	}
+	
+	function error(message)
+	{
+		log("ERROR: " + message);
+		if (layer0ErrorAlert)
+		{
+			//@#@ alert(message);
+		}
+	}
+	
+	function layer0RequestAnimationFrame()
+	{
+		++layer0AnimationFrameRequested;
+		if (layer0AnimationFrameRequested == 1)
+		{
+			// https://developer.mozilla.org/en-US/docs/Web/API/window/requestAnimationFrame
+			requestAnimationFrame(layer0Tick);
+			//alert("Test");
+		}
+	}
+	
+	function layer0KeyDownHandler(e) {
+		if (layer1KeyDownHandler(e))
+		{
+			layer0RequestAnimationFrame();
+		}
+	}
+	
+	function layer0KeyUpHandler(e) {
+		if (layer1KeyUpHandler(e))
+		{
+			layer0RequestAnimationFrame();
+		}
+	}
+	
+	function layer0MouseMoveHandler(e) {
+		if (layer1MouseMoveHandler(e))
+		{
+			layer0RequestAnimationFrame();
+		}
+	}
+	
+	function layer0Tick(currentTime)
+	{
+		layer0AnimationFrameRequested = 0;
+		if (layer1Tick(currentTime, layer0DbgSupport))
+		{
+			layer0RequestAnimationFrame();
+		}
+	}
+
+	// LAYER 0 - ADD LISTENERS AND INVOKE ENTRY POINT
+
+	if (layer0KeyboardSupport)
+	{
+		document.addEventListener("keydown", layer0KeyDownHandler, false);
+		document.addEventListener("keyup", layer0KeyUpHandler, false);
+	}
+	if (layer0MouseSupport)
+	{
+		document.addEventListener("mousemove", layer0MouseMoveHandler, false);
+	}
+
+	layer0RequestAnimationFrame();
+</script>
+
+</body>
+</html>
