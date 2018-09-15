@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Catalpa</title>
+    <style>* { padding: 0; margin: 0; }
+    	canvas { background: #eee; display: block; margin: 0 auto; }</style>
+</head>
+<body>
+
+<div id="game"></div>
+
+<!-- <canvas id="Canvas" width="1024" height="896"></canvas> -->
+<!-- <canvas id="Canvas" width="1024" height="768"></canvas> -->
+<canvas id="Canvas" width="1024" height="768"></canvas>
+
+<script>
+	// Copyright © 2018, NE and LG
+	
+	var finalBuild = false;
+	
+	if (!finalBuild)
+	{
+	}
+	
+	// GLOBAL DATA LAYER
+	
+	// Helper for Coda Navigator
+	function __globalDataLayer()
+	{
+	}
+	
+	// COLOR CONSTANTS
+	
+	var Color1 = "#ffffff";
+	
+	var dbgAreaBGColor = "#000000";
+	var dbgAreaTextColor = "#00ff00";
+		
+	// CANVAS
+	
+	var canvas = document.getElementById("Canvas");
+	var ctx = canvas.getContext("2d");
+	
+	// VARIABLES
+	
+	if (!finalBuild)
+	{
+	}
+	
+	var dbgAreaX = 0;
+	var dbgAreaY = 0;
+	var dbgAreaDX = 1024;
+	var dbgAreaDY = 128;
+	var dbgAreaTextX = 8;
+	var dbgAreaTextY = 20;
+	var dbgAreaTextYK = 16;
+	var dbgAreaTextFont = "16px Arial";
+	
+	var sceneAreaX = 0;
+	var sceneAreaY = 1;
+	var sceneAreaDX = 400;
+	var sceneAreaDY = 300;
+	if (!finalBuild)
+	{
+		sceneAreaY += dbgAreaDY;
+	}
+			
+	var leftPressed = false; // left arrow, A
+	var rightPressed = false; // right arrow, D
+	var upPressed = false; // up arrow, W
+	var downPressed = false; // down arrow, S
+	var spacePressed = false; // enter, space
+	var cancelPressed = false; // ESC
+	var retryPressed = false; // R
+			
+	// APP LAYER
+	
+	// Helper for Coda Navigator
+	function __appLayer()
+	{
+	}
+	
+	// DATA
+	
+	// INPUT
+	
+	function keyDownHandler(e) { // see http://keycode.info/
+		var retVal = false;
+		if(e.keyCode == 37) {
+			leftPressed = true;
+			retVal = true;
+		}
+		else if(e.keyCode == 38) {
+			upPressed = true;
+			retVal = true;
+		}
+		else if(e.keyCode == 39) {
+			rightPressed = true;
+			retVal = true;
+		}
+		else if(e.keyCode == 40) {
+			downPressed = true;
+			retVal = true;
+		}
+		else if(e.keyCode == 65) {
+			leftPressed = true;
+			retVal = true;
+		}
+		else if(e.keyCode == 87) {
+			upPressed = true;
+			retVal = true;
+		}
+		else if(e.keyCode == 68) {
+			rightPressed = true;
+			retVal = true;
+		}
+		else if(e.keyCode == 83) {
+			downPressed = true;
+			retVal = true;
+		}
+		else if(e.keyCode == 32) { // SPACE
+			spacePressed = true;
+			retVal = true;
+		}
+		else if(e.keyCode == 27) { // ESC
+			cancelPressed = true;
+			retVal = true;
+		}
+		else if(e.keyCode == 82) { // R
+			retryPressed = true;
+			startMusicOnce = true;//hack
+			retVal = true;
+		}
+		else if(e.keyCode == 77) { // M
+			if (currentLevel != 0) // hack
+			{
+				gameTriggerAudioRequest = true;
+			}
+			retVal = true;
+		}
+		if ((retVal) && (currentLevel == 0))
+		{
+			startGameRequest = true;
+		}
+		return retVal;
+	}
+	
+	function keyUpHandler(e) {
+		if(e.keyCode == 37) {
+			leftPressed = false;
+			return true;
+		}
+		else if(e.keyCode == 38) {
+			upPressed = false;
+			return true;
+		}
+		else if(e.keyCode == 39) {
+			rightPressed = false;
+			return true;
+		}
+		else if(e.keyCode == 40) {
+			downPressed = false;
+			return true;
+		}
+		else if(e.keyCode == 65) {
+			leftPressed = false;
+			return true;
+		}
+		else if(e.keyCode == 87) {
+			upPressed = false;
+			return true;
+		}
+		else if(e.keyCode == 68) {
+			rightPressed = false;
+			return true;
+		}
+		else if(e.keyCode == 83) {
+			downPressed = false;
+			return true;
+		}
+		else if(e.keyCode == 32) {
+			spacePressed = false;
+			return true;
+		}
+		else if(e.keyCode == 27) {
+			cancelPressed = false;
+			return true;
+		}
+		else if(e.keyCode == 82) {
+			retryPressed = false;
+			return true;
+		}
+		return false;
+	}
+	
+	function mouseMoveHandler(e) {
+		return true;
+	}
+	
+	// INIT
+	
+	var lastTime = 0;
+	
+	var sunX = 200;
+	var sunY = 150;
+	var sunR = 10;
+	var theta = 0;
+	var distanceTraveled2 = 0;
+	
+	var a = 120;
+	var e = .4;
+	
+	function init(currentTime)
+	{
+		lastTime = currentTime;
+	}
+	
+	// DRAW
+	
+	
+	// TICK
+	
+	var doOnce = true;
+	
+	function r(theta)
+	{
+		return (a * (1 - e * e)) / (1 - e * Math.cos(theta * Math.PI / 180));
+	}
+	
+	function tick(currentTime)
+	{
+		if (doOnce)
+		{
+			doOnce = false;
+			init(currentTime);
+			return true;
+		}
+		
+		var retVal = true;
+		
+		drawQuad(sceneAreaX, sceneAreaY, sceneAreaDX, sceneAreaDY, "#000000");
+		
+		var angle = 0;
+		while (angle < 360)
+		{
+			var earthX = sunX + r(angle) * Math.cos(angle * Math.PI / 180);
+			var earthY = sunY + r(angle) * Math.sin(angle * Math.PI / 180);
+			
+			drawQuad(sceneAreaX + earthX, sceneAreaY + earthY,
+				1, 1, "#808080");
+			
+			angle += 10;
+		}
+		
+		
+		
+		var delta = currentTime - lastTime;
+		lastTime = currentTime;
+		
+		var distanceToTravel2 = delta / 20;
+		distanceToTravel2 = distanceToTravel2 * distanceToTravel2;
+		
+		var earthX1 = sunX + r(theta) * Math.cos(theta * Math.PI / 180);
+		var earthY1 = sunY + r(theta) * Math.sin(theta * Math.PI / 180);
+		
+		var distanceTraveled2 = 0;
+		var thetaStep = 0.1;
+		var steps = 0;
+		while (distanceTraveled2 < distanceToTravel2)
+		{
+			++steps;
+			theta += thetaStep;
+			var earthX2 = sunX + r(theta) * Math.cos(theta * Math.PI / 180);
+			var earthY2 = sunY + r(theta) * Math.sin(theta * Math.PI / 180);
+			
+			distanceTraveled2 += ((earthX2 - earthX1) * (earthX2 - earthX1))
+				+ ((earthY2 - earthY1) * (earthY2 - earthY1));
+			earthX1 = earthX2;
+			earthY1 = earthY2;
+		}
+			
+		if (theta > 360)
+		{
+			retVal = false;
+		}
+				
+		drawQuad(sceneAreaX + sunX - sunR, sceneAreaY + sunY - sunR, sunR * 2,
+			sunR * 2, "#FF0000");
+		var earthR = 5;
+		drawQuad(sceneAreaX + earthX1 - earthR, sceneAreaY + earthY1 - earthR,
+			earthR * 2, earthR * 2, "#00FF00");
+		
+		return retVal;
+		//return false; // true - call me again
+	}	
+	
+	function drawQuad(x, y, dx, dy, color)
+	{
+		ctx.beginPath();
+		ctx.rect(x, y, dx, dy);
+		ctx.fillStyle = color;
+		ctx.fill();
+		ctx.closePath();
+	}
+	
+	// LAYER 1
+	
+	// Helper for Coda Navigator
+	function __layer1()
+	{
+	}
+	
+	// LAYER 1 - DBG
+
+	function layer1DbgDrawBackground() {
+		ctx.beginPath();
+		ctx.rect(dbgAreaX, dbgAreaY, dbgAreaDX, dbgAreaDY);
+		ctx.fillStyle = dbgAreaBGColor;
+		ctx.fill();
+		ctx.closePath();
+	}
+
+	function layer1DbgTick(currentTime)
+	{
+		++layer1DbgTickCall;
+		layer1DbgDrawBackground();
+		
+		var framesPerSecond = 0;
+		
+		if (layer1LastCurrentTime != 0)
+		{
+			if (layer1LastCurrentTime < currentTime)
+			{
+				framesPerSecond = 1000 / (currentTime - layer1LastCurrentTime);
+			}
+		}
+		
+		var yK = 0;
+		
+		ctx.font = dbgAreaTextFont;
+		ctx.fillStyle = dbgAreaTextColor;
+		
+		ctx.fillText("CurrentTime: " + currentTime, dbgAreaX + dbgAreaTextX,
+			dbgAreaY + dbgAreaTextY + yK++ * dbgAreaTextYK);
+		ctx.fillText("DrawCall: " + layer1DbgTickCall,
+			dbgAreaX + dbgAreaTextX,
+			dbgAreaY + dbgAreaTextY + yK++ * dbgAreaTextYK);
+		var tickMilliseconds = Math.floor(layer1layer0TickDuration / 1000);
+		ctx.fillText("LastTick: " + tickMilliseconds + "."
+			+ (Math.floor(layer1layer0TickDuration / 100)
+			- Math.floor(tickMilliseconds * 10)) + " ms",
+			dbgAreaX + dbgAreaTextX,
+			dbgAreaY + dbgAreaTextY + yK++ * dbgAreaTextYK);
+		ctx.fillText("dbgEventCall: " + layer1DbgEventCall,
+			dbgAreaX + dbgAreaTextX,
+			dbgAreaY + dbgAreaTextY + yK++ * dbgAreaTextYK);
+		ctx.fillText("FPS: " + Math.round(framesPerSecond),
+			dbgAreaX + dbgAreaTextX,
+			dbgAreaY + dbgAreaTextY + yK++ * dbgAreaTextYK);
+		ctx.fillText("MouseX: " + layer1MouseX, dbgAreaX + dbgAreaTextX,
+			dbgAreaY + dbgAreaTextY + yK++ * dbgAreaTextYK);
+		ctx.fillText("MouseY: " + layer1MouseY, dbgAreaX + dbgAreaTextX,
+			dbgAreaY + dbgAreaTextY + yK++ * dbgAreaTextYK);
+		
+		layer1LastCurrentTime = currentTime;
+	}
+
+	// LAYER 1 - MAIN
+	
+	var layer1LastCurrentTime = 0;
+	var layer1MouseX = 0;
+	var layer1MouseY = 0;
+	
+	//var layer1DbgPause = false;
+	var layer1DbgTickCall = 0;
+	var layer1DbgEventCall = 0;
+	var layer1layer0TickDuration = 0;
+	
+	function layer1KeyDownHandler(e) { // see http://keycode.info/
+		++layer1DbgEventCall;
+		return keyDownHandler(e);
+	}
+	
+	function layer1KeyUpHandler(e) {
+		++layer1DbgEventCall;
+		return keyUpHandler(e);
+	}
+	
+	function layer1MouseMoveHandler(e) {
+		++layer1DbgEventCall;
+		layer1MouseX = e.clientX - canvas.offsetLeft;
+		//if(relativeX > 0 && relativeX < canvas.width) {
+		//}
+		layer1MouseY = e.clientY - canvas.offsetTop;
+		return mouseMoveHandler(e);
+	}
+
+	function layer1Tick(currentTime, dbgSupport)
+	{
+		++layer1DbgTickCall;
+		var retVal = tick(currentTime);
+		if (dbgSupport)
+		{
+			layer1DbgTick(currentTime);
+		}
+		return retVal;
+	}
+
+	// LAYER 0
+	
+	// Helper for Coda Navigator
+	function __layer0()
+	{
+	}
+	
+	// LAYER 0 - CONFIG
+	
+	var layer0KeyboardSupport = true;
+	var layer0MouseSupport = false;
+	var layer0DbgSupport = false;
+	var layer0LogSupport = true;
+	var layer0ErrorAlert = false;
+	if (!finalBuild)
+	{
+		layer0DbgSupport = true;
+	}
+	
+	// LAYER 0 - VARIABLES
+	
+	var layer0AnimationFrameRequested = 0;
+	var layer0AudioUnlocked = false;
+	
+	// LAYER 0 - FUNCTIONS
+	
+	function log(string)
+	{
+		if (layer0LogSupport)
+		{
+			console.log(string);
+		}
+	}
+	
+	function error(message)
+	{
+		log("ERROR: " + message);
+		if (layer0ErrorAlert)
+		{
+			//@#@ alert(message);
+		}
+	}
+	
+	function layer0RequestAnimationFrame()
+	{
+		++layer0AnimationFrameRequested;
+		if (layer0AnimationFrameRequested == 1)
+		{
+			// https://developer.mozilla.org/en-US/docs/Web/API/window/requestAnimationFrame
+			requestAnimationFrame(layer0Tick);
+			//alert("Test");
+		}
+	}
+	
+	function layer0KeyDownHandler(e) {
+		if (layer1KeyDownHandler(e))
+		{
+			layer0AudioUnlocked = true;
+			layer0RequestAnimationFrame();
+		}
+	}
+	
+	function layer0KeyUpHandler(e) {
+		if (layer1KeyUpHandler(e))
+		{
+			layer0RequestAnimationFrame();
+		}
+	}
+	
+	function layer0MouseMoveHandler(e) {
+		if (layer1MouseMoveHandler(e))
+		{
+			layer0RequestAnimationFrame();
+		}
+	}
+	
+	function layer0Tick(currentTime)
+	{
+		var t0 = performance.now();
+		layer0AnimationFrameRequested = 0;
+		if (layer1Tick(currentTime, layer0DbgSupport))
+		{
+			layer0RequestAnimationFrame();
+		}
+		var t1 = performance.now();
+		layer1layer0TickDuration = Math.floor(t1 * 1000 - t0 * 1000);
+	}
+
+	// LAYER 0 - ADD LISTENERS AND INVOKE ENTRY POINT
+
+	if (layer0KeyboardSupport)
+	{
+		document.addEventListener("keydown", layer0KeyDownHandler, false);
+		document.addEventListener("keyup", layer0KeyUpHandler, false);
+	}
+	if (layer0MouseSupport)
+	{
+		document.addEventListener("mousemove", layer0MouseMoveHandler, false);
+	}
+
+	layer0RequestAnimationFrame();
+</script>
+
+</body>
+</html>
